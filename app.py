@@ -20,8 +20,8 @@ SECRET_KEY = "my_secret_2025"
 SYMBOL = "XRPUSDT"
 BASE_URL = "https://api-testnet.bybit.com"
 
-API_KEY = "OfFL3zuIKkZBMVKcK"
-API_SECRET = "n6AqlvTeplWOA2OMPXy59AOUoqP6kGld2MAo"
+API_KEY = "0emDhzRXlV556SgFzl"
+API_SECRET = "ORFCdsunQUJ5wDm8uQymPa6cr9lLUZXJwadp"
 PROXY_URL = "http://user410083:37zj0n@192.124.191.79:7824"
 
 proxies = {'http': PROXY_URL, 'https': PROXY_URL}
