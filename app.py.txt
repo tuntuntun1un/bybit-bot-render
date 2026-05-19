@@ -1,0 +1,104 @@
+import requests
+import time
+import hashlib
+import hmac
+import json
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+# === НАСТРОЙКИ (ПРОВЕРЬ ВСЕ ДАННЫЕ) ===
+SECRET_KEY = "my_secret_2025"        # Секрет для TradingView
+SYMBOL = "XRPUSDT"
+BASE_URL = "https://api-testnet.bybit.com"
+
+# ТВОИ API-КЛЮЧИ ОТ ТЕСТНЕТА
+API_KEY = "OfFL3zuIKkZBMVKcK"
+API_SECRET = "n6AqlvTeplWOA2OMPXy59AOUoqP6kGld2MAo"
+
+# ТВОЙ ПРОКСИ (HTTP, порт 7824)
+PROXY_URL = "http://user410083:37zj0n@192.124.191.79:7824"
+
+proxies = {
+    'http': PROXY_URL,
+    'https': PROXY_URL,
+}
+
+def place_order(side, qty):
+    """Отправляет ордер на Bybit Testnet через прокси."""
+    timestamp = int(time.time() * 1000)
+    
+    # Параметры ордера (тело POST-запроса)
+    order_payload = {
+        "category": "linear",
+        "symbol": SYMBOL,
+        "side": side,
+        "orderType": "Market",
+        "qty": qty,
+        "timeInForce": "GTC",
+    }
+    payload_str = json.dumps(order_payload)
+
+    # Формируем строку для подписи
+    recv_window = "5000"
+    signature_payload = f"{timestamp}{API_KEY}{recv_window}{payload_str}"
+    
+    # Генерируем подпись
+    signature = hmac.new(
+        bytes(API_SECRET, 'utf-8'),
+        bytes(signature_payload, 'utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+
+    # Заголовки для Bybit API v5
+    headers = {
+        'X-BAPI-API-KEY': API_KEY,
+        'X-BAPI-TIMESTAMP': str(timestamp),
+        'X-BAPI-SIGN': signature,
+        'X-BAPI-RECV-WINDOW': recv_window,
+        'Content-Type': 'application/json'
+    }
+
+    # Отправляем запрос через прокси
+    response = requests.post(
+        f"{BASE_URL}/v5/order/create",
+        headers=headers,
+        data=payload_str,
+        proxies=proxies
+    )
+    return response.json()
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    print("🔥 Webhook вызван!")
+    try:
+        data = request.get_json()
+        print(f"📡 Данные: {data}")
+
+        if data.get('secret') != SECRET_KEY:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        signal = data.get('signal')
+        if signal not in ['buy', 'sell']:
+            return jsonify({"error": "Invalid signal"}), 400
+
+        side = "Buy" if signal == 'buy' else "Sell"
+        qty = "10"
+        print(f"🚀 Отправка ордера {side} {qty} XRP через прокси")
+        
+        result = place_order(side, qty)
+        print(f"✅ Ответ Bybit: {result}")
+
+        if result.get('retCode') == 0:
+            print(f"✅ СДЕЛКА ИСПОЛНЕНА! Order ID: {result['result']['orderId']}")
+            return jsonify({"status": "ok", "orderId": result['result']['orderId']}), 200
+        else:
+            print(f"❌ Ошибка Bybit: {result}")
+            return jsonify({"error": result}), 500
+
+    except Exception as e:
+        print(f"❌ КРИТИЧЕСКАЯ ОШИБКА: {e}")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5002)
